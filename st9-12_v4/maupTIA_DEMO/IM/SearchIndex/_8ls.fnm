@@ -1,0 +1,19 @@
+þÿÿÿÅ###id###VisulizationRootBrowsableId###TargetIdNameText.0Text.1
+AlarmClass-###SearchableNonTechnicalFieldNamesOfDocument###ParentIds###ImmediateParentId###ReferenceFieldIdsAcknowledgementGroupTextInvalidAttempts	ValidDaysWarningDaysGenerationsMinNumPsswd
+ServerName
+PortNumberWindowsDomainStationNamePartnerNameNodeNameDisplayNameAcknowledgementModelIdEmailAddressAcknowledgedText
+ComingText	GoingTextCommonAlarmClass	CycleUnit	CycleTimeTextCommentNumber	ShortName
+LogoutTime###SearchFilterIdsTitleLanguageVersionConstant nameEvent class###UpdatableParentIdInterfaceMember_NameInterfaceMember_DatatypeInterfaceMember_ValueInterfaceMember_CommentNetwork titleLADFBD CodeSCL CodeInstance DBAuthorFamilyUser-defined IDNameInFunctionalViewNameInDBFullNameInDBDatatypeAddressValue	BackColor	GridColorBackFillStyleBorderColor	EdgeStyleFlashingBorderBackColorFirstGradientColor
+FocusColorFont	ForeColorHorizontalAlignmentHorizontalPictureAlignmentMiddleGradientColorModePictureAutoSizingSecondGradientColorTextOffTextOnTextOrientationVerticalAlignmentVerticalPictureAlignment	FunctionsUITypeEditorBitPositionUITypeEditorTagExpressionRangeFromToAdaptPicture
+AutoSizingPictureTransparentColorAboveUpperLimitColorBelowLowerLimitColor
+BlinkColorFillColorModeFlipRotationAlarmLowerLimitColorAlarmUpperLimitColorBarBackColorBarEdgeStyleBarOrientation
+ScaleColorScalePositionSegmentColoringUnitWarningLowerLimitColorWarningUpperLimitColorPropertyNameTagValueForPropertyTagPage
+DataFormatFormatPatternProcessValueEvenRowBackColorSelectBackColorSelectForeColorTextListAlarmSourceButtonBackColorButtonBackFillStyleButtonBarStyleButtonBorderBackColorButtonBorderColorButtonEdgeStyleButtonFirstGradientColorButtonMiddleGradientColorButtonSecondGradientColorCaptionColumnTextAckGroupColumnTextAlarmStateColumnTextAlarmTextColumnTextClassNameColumnTextDateColumnTextDeviceColumnTextDiagnosableColumnTextNumberColumnTextTime
+FilterTextGridlineColorSelectionBackColorSelectionForeColorSortByTimeDirectionTableBackColorTableEvenRowBackColor	TableFontTableForeColorTableHeaderBackColorTableHeaderBackFillStyleTableHeaderBorderBackColorTableHeaderBorderColorTableHeaderEdgeStyleTableHeaderFirstGradientColorTableHeaderFontTableHeaderForeColorTableHeaderMiddleGradientColorTableHeaderSecondGradientColorViewTypeDataTypeTagAddressPanelInfoAcquisitionTriggerModeAcquisitionCycleConfirmationTypeCodingPlcNameControllerTag	JobNumber
+StartValueAddressAccessMode
+Connection
+LineColor1
+LineColor2OperatableAreaColor
+Visibility###ReconstitutionDataIDAssociatedCultureFieldIdAssociatedProjectVersion!AssociatedIndexDataVersionFieldId,AssociatedTechnicalFieldNamesHashCodeFieldId-AssociatedTechnicalFieldContentVersionFieldIdIndexAtomStore	PictureOnCaptionColorCaptionFontCaptionTextHelpTextInnerBackColorOffInnerBackColorOn
+PictureOffSwitchOrientationColor	FillStyleLineEndShapeStyle
+StartStyleStyleEndStyleGroup
