@@ -1,0 +1,181 @@
+#fSecImpEdge(CLK := "Clock_1Hz");
+REGION Aut/Man
+    // switching state of engine - automatic or manual control (default state is manual)
+    IF #HeatingPhase.Cmd.AutCtrl THEN
+        #HeatingPhase.State.AutCtrl := 1;
+        #HeatingPhase.State.ManCtrl := 0;
+        #HeatingPhase.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #HeatingPhase.Cmd.ManCtrl THEN
+        #HeatingPhase.State.AutCtrl := 0;
+        #HeatingPhase.State.ManCtrl := 1;
+        #HeatingPhase.Cmd.ManCtrl := 0;
+    END_IF;
+    
+    IF NOT #HeatingPhase.State.AutCtrl AND NOT #HeatingPhase.State.ManCtrl THEN
+        #HeatingPhase.State.ManCtrl := 1;
+        #HeatingPhase.State.AutCtrl := 0;
+    END_IF;
+END_REGION
+
+REGION ManCtrl
+    // processing manual actions - if command is processed, it is sets to FALSE even if can't be processed
+        // real states of phase are writed into states in phase structure
+    IF #HeatingPhase.State.ManCtrl THEN
+        IF #HeatingPhase.Cmd.StartMan THEN
+            #fTime := 0;
+            #HeatingPhase.State.Running := 1;
+            #HeatingPhase.State.Idle := 0;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #HeatingPhase.Cmd.ResumeMan AND #HeatingPhase.State.Paused THEN
+            #HeatingPhase.State.Running := 1;
+            #HeatingPhase.State.Idle := 0;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.ResumeMan := 0;
+        END_IF;
+        
+        IF #HeatingPhase.Cmd.PauseMan THEN
+            #HeatingPhase.State.Running := 0;
+            #HeatingPhase.State.Idle := 0;
+            #HeatingPhase.State.Paused := 1;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.PauseMan := 0;
+        END_IF;
+        
+        IF #HeatingPhase.Cmd.StopMan THEN
+            #HeatingPhase.State.Running := 0;
+            #HeatingPhase.State.Idle := 1;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.StopMan := 0;
+        END_IF;
+    END_IF;
+END_REGION
+
+REGION AutCtrl
+    // if request to run in automatic mode -> set auto request to heat to 1, if not request to heat 0
+    // commands should be sets to false after their processing
+    IF #HeatingPhase.State.AutCtrl THEN
+        IF #HeatingPhase.Cmd.StartMan THEN
+            #HeatingPhase.State.Running := 1;
+            #HeatingPhase.State.Idle := 0;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #HeatingPhase.Cmd.StopMan THEN
+            #HeatingPhase.State.Running := 0;
+            #HeatingPhase.State.Idle := 1;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.StopMan := 0;
+        END_IF;
+        
+        //auto
+        IF #HeatingPhase.Cmd.StartAut THEN
+            #HeatingPhase.State.Running := 1;
+            #HeatingPhase.State.Idle := 0;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.StartAut := 0;
+        END_IF;
+        
+        IF #HeatingPhase.Cmd.StopAut THEN
+            #HeatingPhase.State.Running := 0;
+            #HeatingPhase.State.Idle := 1;
+            #HeatingPhase.State.Paused := 0;
+            //#HeatingPhase.State.Done := 0;
+            #HeatingPhase.Cmd.StopAut := 0;
+        END_IF;
+    END_IF;
+    
+END_REGION
+
+REGION Done
+    //every phase should have finish condition - heating phase - if water temp is on requested value for 15 seconds with 1°C hysteresis
+    //after that done state should be setted to 1
+    IF (#aiWaterTemp < (#HeatingPhase.Param.ReqTemp + 0.5)) AND (#aiWaterTemp > (#HeatingPhase.Param.ReqTemp - 0.5)) THEN
+        IF (#fTime > 60) THEN           // ftime requires half because increments only every 2 sec
+            #HeatingPhase.State.Running := 0;
+            #HeatingPhase.State.Idle := 1;
+            #HeatingPhase.State.Paused := 0;
+            #HeatingPhase.State.Done := 1;
+        END_IF;
+        IF (#fSecImpEdge.Q) THEN
+            #fTime := #fTime+1;
+        END_IF;
+    ELSE
+        #fTime := 0; 
+    END_IF;
+    
+    IF #HeatingPhase.Cmd.ResetDone AND #HeatingPhase.State.Done THEN
+        //#FillingPhase.State.Running := 0;
+        //#FillingPhase.State.Idle := 1;
+        //#FillingPhase.State.Paused := 0;
+        #HeatingPhase.State.Done := 0;
+        #HeatingPhase.Cmd.ResetDone := 0;
+        #fTime := 0;
+    ELSIF #HeatingPhase.Cmd.ResetDone THEN
+        #HeatingPhase.Cmd.ResetDone := 0;
+    END_IF;
+    
+    
+END_REGION
+
+REGION States 
+    //Command valve in cases of states
+    // Running - start heating  
+    // Idle - stop heating
+    // Pause - stop heating (alternative is hold actual temp)
+    IF (#HeatingPhase.Param.ReqTemp > 90) THEN
+        #HeatingPhase.Param.ReqTemp := 90;
+    END_IF;
+    IF (#HeatingPhase.Param.ReqTemp < 20) THEN
+        #HeatingPhase.Param.ReqTemp := 19.8;
+    END_IF;
+    
+    IF #HeatingPhase.State.AutCtrl AND #HeatingPhase.State.Running THEN
+        #Heater.Param.HeatingSetPointAutomat := #HeatingPhase.Param.ReqTemp;
+        #Heater.Cmd.Req2RunAutCtrl := 1;
+    END_IF;
+    
+    IF #HeatingPhase.State.AutCtrl AND #HeatingPhase.State.Idle THEN
+        #Heater.Param.HeatingSetPointAutomat := 0;
+        #Heater.Cmd.Req2RunAutCtrl := 0;
+        #fTime := 0;
+    END_IF;
+    
+    IF #HeatingPhase.State.AutCtrl AND #HeatingPhase.State.Paused THEN
+        #Heater.Param.HeatingSetPointAutomat := 0;
+        #Heater.Cmd.Req2RunAutCtrl := 0;
+        #fTime := 0;
+    END_IF;
+    
+END_REGION
+
+// delault state of phase - if not any state sets state to idle
+IF (NOT #HeatingPhase.State.Running) AND (NOT #HeatingPhase.State.Paused) THEN
+    #HeatingPhase.State.Idle := 1;
+END_IF;
+
+// write binary states into int value for visualization
+IF #HeatingPhase.State.Idle THEN
+    #HeatingPhase.State.StateInt := #Idle;
+END_IF;
+IF #HeatingPhase.State.Running THEN
+    #HeatingPhase.State.StateInt := #Running;
+END_IF;
+IF #HeatingPhase.State.Paused THEN
+    #HeatingPhase.State.StateInt := #Pause;
+END_IF;
+IF #HeatingPhase.State.Done THEN
+    #HeatingPhase.State.StateInt := #Idle;
+END_IF;
+
+

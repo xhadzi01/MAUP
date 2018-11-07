@@ -1,0 +1,172 @@
+REGION OpenState 
+    // set real state of valve input into valve structure - input of valve can be taken from limit sensor...
+    #iVal_Struct.State.Open := #iOpen;
+    #iVal_Struct.State.Closed := #iClose;
+END_REGION
+
+REGION Manual/Automat //
+    // switching state of engine - automatic or manual control (default state is manual)
+    IF #iVal_Struct.Cmd.AutCtrl THEN
+        #iVal_Struct.State.AutCtrl := 1;
+        #iVal_Struct.State.ManCtrl := 0;
+        #iVal_Struct.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #iVal_Struct.Cmd.ManCtrl THEN
+        #iVal_Struct.State.AutCtrl := 0;
+        #iVal_Struct.State.ManCtrl := 1;
+        #iVal_Struct.Cmd.ManCtrl := 0;
+    END_IF;
+    IF NOT #iVal_Struct.State.AutCtrl AND NOT #iVal_Struct.State.ManCtrl THEN
+        #iVal_Struct.State.ManCtrl := 1;
+    END_IF;
+END_REGION
+
+REGION MR/MAR      //
+    // setting auxilary signals (may run, may auto run) - MR AND NOT MAR - eng should be started in manual mode, MAR - should be started in automatic mode
+    #iVal_Struct.State.MayRun := NOT #iVal_Struct.State.GenErr AND NOT #iVal_Struct.State.AutCtrl;
+    #iVal_Struct.State.MayAutoRun := NOT #iVal_Struct.State.GenErr AND #iVal_Struct.State.AutCtrl;
+END_REGION
+
+REGION ManCtrl  //
+    // processing manual actions - if command is processed, it is sets to FALSE even if can't be processed
+    // Valve commands are open, close and stop - valve can be stopped intermediate position
+    //IF #iVal_Struct.State.ManCtrl THEN
+        IF #iVal_Struct.Cmd.OpenMan THEN
+            IF #iVal_Struct.State.MayRun AND #iVal_Struct.State.ManCtrl THEN
+                #oOpen := 1;
+                #oClose := 0;
+                #iVal_Struct.State.OpenOut := 1;
+                #iVal_Struct.State.CloseOut := 0;
+            END_IF;
+            #iVal_Struct.Cmd.OpenMan := 0;
+        END_IF;
+        
+        IF #iVal_Struct.Cmd.CloseMan THEN
+            IF #iVal_Struct.State.MayRun AND #iVal_Struct.State.ManCtrl THEN
+                #iVal_Struct.State.OpenOut := 0;
+                #iVal_Struct.State.CloseOut := 1;
+            END_IF;
+            #iVal_Struct.Cmd.CloseMan := 0;
+        END_IF;
+        
+        IF #iVal_Struct.Cmd.StopMan AND #iVal_Struct.State.ManCtrl THEN
+            #iVal_Struct.State.OpenOut := 0;
+            #iVal_Struct.State.CloseOut := 0;
+        END_IF;
+        #iVal_Struct.Cmd.StopMan := 0;
+    //END_IF
+END_REGION
+
+REGION AutCtrl
+    //if request to run in automatic mode -> set outputs to right states if MAR
+    //AutoRequest shouldn't be reseted to false state
+    //if request to open and request to close are setted to 1 simultaneously - outputs should be 0.
+    IF #iVal_Struct.State.AutCtrl THEN
+        IF #iVal_Struct.State.MayAutoRun AND #iVal_Struct.Cmd.Req2OpenAut AND NOT #iVal_Struct.Cmd.Req2CloseAut THEN
+            #iVal_Struct.State.OpenOut := 1;
+            #iVal_Struct.State.CloseOut := 0;
+            #iVal_Struct.Cmd.Req2CloseAut := 0;   // ADD
+        ELSIF  #iVal_Struct.State.MayAutoRun AND #iVal_Struct.Cmd.Req2CloseAut AND NOT #iVal_Struct.Cmd.Req2OpenAut THEN
+            #iVal_Struct.State.OpenOut := 0;
+            #iVal_Struct.State.CloseOut := 1;
+            #iVal_Struct.Cmd.Req2OpenAut := 0;   // ADD
+        (*ELSE
+            #iVal_Struct.State.OpenOut := 0;
+            #iVal_Struct.State.CloseOut := 0;*)
+        END_IF;
+    END_IF;
+END_REGION
+
+#oClose := #iVal_Struct.State.CloseOut;
+#oOpen := #iVal_Struct.State.OpenOut;
+
+REGION ErrStates´
+    // definition of error states 
+    // error - input from digital input of plc - fyzical state of valve
+    // calculating start up fail - if output is sets to open or close, it's expected feedback from limit sensor in defined time, if feedback doesn't show in this time, it should be start up fail error
+    // merge of these two error is general error
+    // error is both inputs (open and closed) true state
+    //
+    
+    #fTimeToOpen(IN := #iVal_Struct.State.OpenOut AND NOT #iVal_Struct.State.CloseOut,
+                 PT := #iVal_Struct.Param.Time2Open );
+
+    #fTimeToClose(IN := NOT #iVal_Struct.State.OpenOut AND #iVal_Struct.State.CloseOut,
+                  PT := #iVal_Struct.Param.Time2Open );
+    
+    
+    IF ((NOT #iVal_Struct.State.Closed) AND(NOT #iVal_Struct.State.Open)AND(NOT #iVal_Struct.State.StartUpFail)) THEN
+        IF  (#fTimeToClose.Q)  THEN
+            #iVal_Struct.State.StartUpFail := 1;
+        ELSIF (#fTimeToOpen.Q)  THEN
+            #iVal_Struct.State.StartUpFail := 1;
+        ELSE
+            #iVal_Struct.State.StartUpFail := 0;
+        END_IF;
+    END_IF;
+    
+ 
+    
+    // start up fail can be reseted by operator, command resetSUF, resets SUF and engine should be started again
+    #iVal_Struct.State.Err := #iError;
+    #iVal_Struct.State.GenErr := #iVal_Struct.State.StartUpFail OR #iVal_Struct.State.Err;
+    
+    IF #iVal_Struct.Cmd.ResetSUF  THEN
+        #iVal_Struct.State.StartUpFail := 0;
+        #iVal_Struct.Cmd.ResetSUF := 0;
+    END_IF;
+    
+    // if error state exists outputs should be in stop state
+    IF #iVal_Struct.State.GenErr THEN
+        #iVal_Struct.Cmd.ManCtrl := 1;
+        //#iVal_Struct.State.OpenOut := 0;
+        //#iVal_Struct.State.CloseOut := 0;
+    END_IF;
+    
+END_REGION
+
+
+
+REGION StatusInt
+    //write combination of states into int value for visualization (valve - combination of open, close state and error)
+    IF #iOpen AND NOT #iClose AND NOT #iVal_Struct.State.GenErr THEN
+        #iVal_Struct.State.StColor := #Open;
+    ELSE
+        IF NOT #iOpen AND #iClose AND NOT #iVal_Struct.State.GenErr THEN
+            #iVal_Struct.State.StColor := #Closed;
+        ELSE
+            IF #iOpen AND NOT #iClose AND #iVal_Struct.State.GenErr THEN
+                #iVal_Struct.State.StColor := #OpenAndErr;
+            ELSE
+                IF NOT #iOpen AND #iClose AND #iVal_Struct.State.GenErr THEN
+                    #iVal_Struct.State.StColor := #ClosedAndErr;
+                ELSE
+                    IF NOT #iOpen AND NOT #iClose AND NOT #iVal_Struct.State.GenErr THEN
+                        #iVal_Struct.State.StColor := #NotOpenNotClosedNotErr;
+                    ELSE
+                        IF NOT #iOpen AND NOT #iClose AND #iVal_Struct.State.GenErr THEN
+                            #iVal_Struct.State.StColor := #NotOpenNotClosedAndErr;
+                        ELSE
+                            IF #iOpen AND #iClose AND #iVal_Struct.State.GenErr THEN
+                                #iVal_Struct.State.StColor := #OpenAndClosedAndErr;
+                            ELSE
+                                IF #iOpen AND #iClose AND NOT #iVal_Struct.State.GenErr THEN
+                                    #iVal_Struct.State.StColor := #OpenAndClosedNotErr;
+                                END_IF;
+                            END_IF;
+                        END_IF;
+                    END_IF;
+                END_IF;
+            END_IF;
+        END_IF;
+    END_IF;
+END_REGION
+
+
+
+
+
+
+
+
+

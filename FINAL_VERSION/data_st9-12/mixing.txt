@@ -1,0 +1,171 @@
+#fSecImp(CLK :="Clock_1Hz" );
+//"Clock_1Hz"
+REGION Aut/Man
+    // switching state of engine - automatic or manual control (default state is manual)
+    
+    IF #MixingPhase.Cmd.AutCtrl THEN
+        #MixingPhase.State.AutCtrl := 1;
+        #MixingPhase.State.ManCtrl := 0;
+        #MixingPhase.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #MixingPhase.Cmd.ManCtrl THEN
+        #MixingPhase.State.AutCtrl := 0;
+        #MixingPhase.State.ManCtrl := 1;
+        #MixingPhase.Cmd.ManCtrl := 0;
+    END_IF;
+    
+    IF NOT #MixingPhase.State.AutCtrl AND NOT #MixingPhase.State.ManCtrl THEN
+        #MixingPhase.State.ManCtrl := 1;
+        #MixingPhase.State.AutCtrl := 0;
+    END_IF;
+
+END_REGION
+
+REGION ManCtrl
+    // processing manual actions - if command is processed, it is sets to FALSE even if can't be processed
+    // Phase commands are start, stop, pause and resume 
+    // Start - start mixing  
+    // Stop - stop mixing
+    // Pause - stop mixing 
+    // Resume - start mixing    
+    // real states of phase are writed into states in phase structure
+    // 
+    IF #MixingPhase.State.ManCtrl THEN
+        IF #MixingPhase.Cmd.StartMan THEN
+            #MixingPhase.State.Running := 1;
+            #MixingPhase.State.Idle := 0;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            #MixingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #MixingPhase.Cmd.ResumeMan AND #MixingPhase.State.Paused THEN
+            #MixingPhase.State.Running := 1;
+            #MixingPhase.State.Idle := 0;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            #MixingPhase.Cmd.ResumeMan := 0;
+        END_IF;
+        
+        IF #MixingPhase.Cmd.PauseMan THEN
+            #MixingPhase.State.Running := 0;
+            #MixingPhase.State.Idle := 0;
+            #MixingPhase.State.Paused := 1;
+            //#MixingPhase.State.Done := 0;
+            #MixingPhase.Cmd.PauseMan := 0;
+        END_IF;
+        
+        IF #MixingPhase.Cmd.StopMan THEN
+            #MixingPhase.State.Running := 0;
+            #MixingPhase.State.Idle := 1;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            #MixingPhase.Cmd.StopMan := 0;
+        END_IF;
+    END_IF;
+END_REGION
+
+REGION AutCtrl
+    // if request to run in automatic mode -> set auto request to mixing to 1, if not request to mixing is 0
+    // commands should be sets to false after their processing
+    IF #MixingPhase.State.AutCtrl THEN
+        IF #MixingPhase.Cmd.StartMan THEN
+            #MixingPhase.State.Running := 1;
+            #MixingPhase.State.Idle := 0;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            
+            #MixingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #MixingPhase.Cmd.StopMan THEN
+            #MixingPhase.State.Running := 0;
+            #MixingPhase.State.Idle := 1;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            #MixingPhase.Cmd.StopMan := 0;
+        END_IF;
+        //auto
+        IF #MixingPhase.Cmd.StartAut THEN
+            #MixingPhase.State.Running := 1;
+            #MixingPhase.State.Idle := 0;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            
+            #MixingPhase.Cmd.StartAut := 0;
+        END_IF;
+        
+        IF #MixingPhase.Cmd.StopAut THEN
+            #MixingPhase.State.Running := 0;
+            #MixingPhase.State.Idle := 1;
+            #MixingPhase.State.Paused := 0;
+            //#MixingPhase.State.Done := 0;
+            #MixingPhase.Cmd.StopAut := 0;
+        END_IF;
+        
+    END_IF;
+    
+END_REGION
+
+
+REGION Done
+    // every phase should have finish condition - mixing phase - if time of runnig is bigger or same as requested
+    // after that done state should be setted to 1
+
+    IF (#fElapsedTime > #MixingPhase.Param.TimeSec) THEN
+        #MixingPhase.State.Running := 0;
+        #MixingPhase.State.Idle := 1;
+        #MixingPhase.State.Paused := 0;
+        #MixingPhase.State.Done := 1;
+    END_IF;
+    
+    IF #MixingPhase.Cmd.ResetDone AND #MixingPhase.State.Done THEN
+        #MixingPhase.State.Done := 0;
+        #MixingPhase.Cmd.ResetDone := 0;
+        #fElapsedTime := 0;
+    ELSIF #MixingPhase.Cmd.ResetDone THEN
+        #MixingPhase.Cmd.ResetDone := 0;
+    END_IF;
+    
+END_REGION
+
+REGION States 
+    //Command mixer in cases of states
+    IF #MixingPhase.State.AutCtrl AND #MixingPhase.State.Running THEN
+        #MixerEng.Cmd.Req2RunAutCtrl := 1;
+        IF #fSecImp.Q THEN
+            #fElapsedTime := #fElapsedTime +1;
+        END_IF;
+    END_IF;
+    
+    IF #MixingPhase.State.AutCtrl AND #MixingPhase.State.Idle THEN
+        #MixerEng.Cmd.Req2RunAutCtrl := 0;
+        #fElapsedTime := 0;
+    END_IF;
+    
+    IF #MixingPhase.State.AutCtrl AND #MixingPhase.State.Paused THEN
+        #MixerEng.Cmd.Req2RunAutCtrl := 0;
+    END_IF;
+    
+END_REGION
+
+
+// delault state of phase - if not any state sets state to idle
+IF (NOT #MixingPhase.State.Running) AND (NOT #MixingPhase.State.Paused) THEN
+    #MixingPhase.State.Idle := 1;
+    #fElapsedTime := 0;
+END_IF;
+
+// write binary states into int value for visualization
+IF #MixingPhase.State.Idle THEN
+    #MixingPhase.State.StateInt := #Idle;
+END_IF;
+IF #MixingPhase.State.Running THEN
+    #MixingPhase.State.StateInt := #Running;
+END_IF;
+IF #MixingPhase.State.Paused THEN
+    #MixingPhase.State.StateInt := #Pause;
+END_IF;
+IF #MixingPhase.State.Done THEN
+    #MixingPhase.State.StateInt := #Idle;
+END_IF;

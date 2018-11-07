@@ -1,0 +1,207 @@
+REGION Aut/Man
+    // switching state of engine - automatic or manual control (default state is manual)
+     
+    IF #FillingPhase.Cmd.AutCtrl THEN
+        #FillingPhase.State.AutCtrl := 1;
+        #FillingPhase.State.ManCtrl := 0;
+        #FillingPhase.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #FillingPhase.Cmd.ManCtrl THEN
+        #FillingPhase.State.AutCtrl := 0;
+        #FillingPhase.State.ManCtrl := 1;
+        #FillingPhase.Cmd.ManCtrl := 0;
+    END_IF;
+    
+    IF NOT #FillingPhase.State.AutCtrl AND NOT #FillingPhase.State.ManCtrl THEN
+        #FillingPhase.State.ManCtrl := 1;
+        #FillingPhase.State.AutCtrl := 0;
+    END_IF;
+    
+    
+ END_REGION
+
+REGION ManCtrl
+    // processing manual actions - if command is processed, it is sets to FALSE even if can't be processed
+    // Phase commands are start, stop, pause and resume 
+    // Start - open filling valve 
+    // Stop - close filling valve
+    // Pause - close filling valve
+    // Resume - open filling valve
+    // real states of phase are writed into states in phase structure
+    // 
+    IF #FillingPhase.State.ManCtrl AND #FillingValve.State.AutCtrl  THEN
+        IF #FillingPhase.Cmd.StartMan THEN
+            #FillingPhase.State.Running := 1;
+            #FillingPhase.State.Idle := 0;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingValve.Cmd.Req2OpenAut := 1;
+            #FillingValve.Cmd.Req2CloseAut := 0;
+            #FillingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #FillingPhase.Cmd.ResumeMan AND #FillingPhase.State.Paused THEN
+            #FillingPhase.State.Running := 1;
+            #FillingPhase.State.Idle := 0;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingValve.Cmd.Req2OpenAut := 1;
+            #FillingValve.Cmd.Req2CloseAut := 0;
+            #FillingPhase.Cmd.ResumeMan := 0;
+        END_IF;
+        
+        IF #FillingPhase.Cmd.PauseMan THEN
+            #FillingPhase.State.Running := 0;
+            #FillingPhase.State.Idle := 0;
+            #FillingPhase.State.Paused := 1;
+            //#FillingPhase.State.Done := 0;
+            #FillingValve.Cmd.Req2OpenAut := 0;
+            #FillingValve.Cmd.Req2CloseAut := 1;
+            #FillingPhase.Cmd.PauseMan := 0;
+        END_IF;
+        
+        IF #FillingPhase.Cmd.StopMan THEN
+            #FillingPhase.State.Running := 0;
+            #FillingPhase.State.Idle := 1;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingValve.Cmd.Req2OpenAut := 0;
+            #FillingValve.Cmd.Req2CloseAut := 1;
+            #FillingPhase.Cmd.StopMan := 0;
+        END_IF;
+    END_IF;
+ END_REGION
+
+REGION AutCtrl
+    // if request to run in automatic mode, and phase can be run in automatic mode, switch phase to running
+    // 
+    IF #FillingPhase.State.AutCtrl AND #FillingValve.State.AutCtrl THEN
+        IF #FillingPhase.Cmd.StartMan THEN
+            #FillingPhase.State.Running := 1;
+            #FillingPhase.State.Idle := 0;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #FillingPhase.Cmd.StopMan THEN
+            #FillingPhase.State.Running := 0;
+            #FillingPhase.State.Idle := 1;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingPhase.Cmd.StopMan := 0;
+        END_IF;
+        
+        // auto
+        IF #FillingPhase.Cmd.StartAut THEN
+            #FillingPhase.State.Running := 1;
+            #FillingPhase.State.Idle := 0;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingValve.Cmd.Req2OpenAut := 1;
+            #FillingValve.Cmd.Req2CloseAut := 0;
+            #FillingPhase.Cmd.StartAut := 0;
+        END_IF;
+        
+        IF #FillingPhase.Cmd.StopAut THEN
+            #FillingPhase.State.Running := 0;
+            #FillingPhase.State.Idle := 1;
+            #FillingPhase.State.Paused := 0;
+            //#FillingPhase.State.Done := 0;
+            #FillingValve.Cmd.Req2OpenAut := 0;
+            #FillingValve.Cmd.Req2CloseAut := 1;
+            #FillingPhase.Cmd.StopAut := 0;
+        END_IF;
+        
+    END_IF;
+    
+END_REGION
+
+REGION Done
+    //every phase should have finish condition - filling phase - if water level is above requested level
+    //after that done state should be setted to 1
+    IF (#FillingPhase.WaterLevel > #FillingPhase.Param.FillLevel) AND #FillingValve.State.Closed AND  #FillingPhase.State.Running THEN
+        #FillingPhase.State.Running := 0;
+        #FillingPhase.State.Idle := 1;
+        #FillingPhase.State.Paused := 0;
+        #FillingPhase.State.Done := 1;
+    END_IF;
+    
+    IF #FillingPhase.Cmd.ResetDone AND #FillingPhase.State.Done THEN
+        //#FillingPhase.State.Running := 0;
+        //#FillingPhase.State.Idle := 1;
+        //#FillingPhase.State.Paused := 0;
+        #FillingPhase.State.Done := 0;
+        #FillingPhase.Cmd.ResetDone := 0;
+    ELSIF #FillingPhase.Cmd.ResetDone THEN
+        #FillingPhase.Cmd.ResetDone := 0;
+    END_IF;
+    
+    
+    // command reset done resets done state and than resets command
+END_REGION
+
+REGION States 
+    //Command valve in cases of states
+    //
+    IF (#FillingPhase.Param.FillLevel > 1.78) THEN
+        #FillingPhase.Param.FillLevel := 1.78;
+    END_IF;
+    
+    IF (#FillingPhase.Param.FillLevel < 0) THEN
+        #FillingPhase.Param.FillLevel := 0;
+    END_IF;
+    
+    IF #FillingPhase.State.AutCtrl AND #FillingPhase.State.Running THEN
+        IF #FillingPhase.WaterLevel < #FillingPhase.Param.FillLevel THEN
+            #FillingValve.Cmd.Req2OpenAut := 1;
+            #FillingValve.Cmd.Req2CloseAut := 0;
+        ELSE
+            #FillingValve.Cmd.Req2CloseAut := 1;
+            #FillingValve.Cmd.Req2OpenAut := 0;
+        END_IF;
+    END_IF;
+    
+    IF #FillingPhase.State.AutCtrl AND #FillingPhase.State.Idle THEN
+        
+        #FillingValve.Cmd.Req2CloseAut := 1;
+        #FillingValve.Cmd.Req2OpenAut := 0;
+        
+    END_IF;
+    
+    IF #FillingPhase.State.AutCtrl AND #FillingPhase.State.Paused THEN
+        
+        #FillingValve.Cmd.Req2CloseAut := 1;
+        #FillingValve.Cmd.Req2OpenAut := 0;
+        
+    END_IF;
+    
+    IF #FillingPhase.State.AutCtrl AND #FillingPhase.State.Done THEN
+        
+        #FillingValve.Cmd.Req2CloseAut := 1;
+        #FillingValve.Cmd.Req2OpenAut := 0;
+        
+    END_IF;
+    
+    
+    
+END_REGION
+
+// delault state of phase - if not any state sets state to idle    
+IF (NOT #FillingPhase.State.Running) AND (NOT #FillingPhase.State.Done) AND (NOT #FillingPhase.State.Paused) THEN
+    #FillingPhase.State.Idle := 1;
+END_IF;
+
+// write binary states into int value for visualization
+IF #FillingPhase.State.Idle THEN
+    #FillingPhase.State.Stateint := #Idle;
+END_IF;
+IF #FillingPhase.State.Running THEN
+    #FillingPhase.State.Stateint := #Running;
+END_IF;
+IF #FillingPhase.State.Paused THEN
+    #FillingPhase.State.Stateint := #Pause;
+END_IF;
+IF #FillingPhase.State.Done THEN
+    #FillingPhase.State.Stateint := #Idle;
+END_IF;

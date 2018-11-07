@@ -1,0 +1,151 @@
+REGION RunningTime                   
+    // counting running time of engine - (motoseconds in real situation it should be moto hours)
+    // detection rising edge of input secimp - should be conected 1Hz internal clock from PLC
+    // counting running time of engine - (motoseconds in real situation it should be moto hours)
+    // detection rising edge of input secimp - should be conected 1Hz internal clock from PLC
+    #SecImpEdge(CLK := #iSecImp);
+    
+    IF #iEng_Struct.Cmd.SetRT >= 0 THEN
+        #iEng_Struct.State.RT := #iEng_Struct.Cmd.SetRT;
+        #iEng_Struct.Cmd.SetRT := -1;
+    END_IF;
+    
+    IF #SecImpEdge.Q = 1 AND #iRunning = 1 THEN
+        #iEng_Struct.State.RT := #iEng_Struct.State.RT + 1;
+    END_IF;  
+END_REGION
+
+REGION RunState 
+    // set real state of engine input into engine structure - input of running
+    // engine can be taken from frequential converter, speed sensor, or just
+    // from switching element
+    // 
+    #iEng_Struct.State.Run := #iRunning;
+   END_REGION
+
+REGION Manual/Automat 
+    // switching state of engine - automatic or manual control (default state is manual)
+    IF #iEng_Struct.Cmd.AutCtrl THEN
+        #iEng_Struct.State.AutCtrl := 1;
+        #iEng_Struct.State.ManCtrl := 0;
+        #iEng_Struct.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #iEng_Struct.Cmd.ManCtrl THEN
+        #iEng_Struct.State.AutCtrl := 0;
+        #iEng_Struct.State.ManCtrl := 1;
+        #iEng_Struct.Cmd.ManCtrl := 0;
+    END_IF;
+    IF NOT #iEng_Struct.State.AutCtrl AND NOT #iEng_Struct.State.ManCtrl THEN
+        #iEng_Struct.State.ManCtrl := 1;
+        #iEng_Struct.State.AutCtrl := 0;
+    END_IF;
+END_REGION
+
+REGION MR/MAR 
+    // setting auxilary signals (may run, may auto run) - MR AND NOT MAR - eng should be started in manual mode,
+    // MAR - should be started in automatic mode
+    #iEng_Struct.State.MayRun := NOT #iEng_Struct.State.GenErr AND NOT #iEng_Struct.State.AutCtrl;
+    #iEng_Struct.State.MayAutoRun := NOT #iEng_Struct.State.GenErr AND #iEng_Struct.State.AutCtrl;
+   END_REGION
+
+REGION ManCtrl
+    // processing manual actions - if command is processed, it is set to FALSE even if can't be processed
+    // Engine commands are turn off (stop) and turn on (start
+    IF #iEng_Struct.Cmd.TurnOnMan THEN
+        IF #iEng_Struct.State.MayRun AND #iEng_Struct.State.ManCtrl THEN
+            #iEng_Struct.State.RunOut := 1;
+        END_IF;
+        #iEng_Struct.Cmd.TurnOnMan := 0;
+    END_IF;
+    
+    IF #iEng_Struct.Cmd.TurnOffMan THEN
+        IF #iEng_Struct.State.MayRun AND #iEng_Struct.State.ManCtrl THEN
+            #iEng_Struct.State.RunOut := 0;
+        END_IF;
+        #iEng_Struct.Cmd.TurnOffMan := 0;
+    END_IF;
+    
+END_REGION
+
+REGION AutCtrl 
+    //if request to run in automatic mode set outputs to right states if MAR
+    //AutoRequest shouldn't be reseted to false state
+    //
+    IF #iEng_Struct.State.AutCtrl THEN
+        IF #iEng_Struct.State.MayAutoRun AND #iEng_Struct.Cmd.Req2RunAutCtrl THEN
+            #iEng_Struct.State.RunOut := 1;
+        ELSIF #iEng_Struct.State.MayAutoRun AND NOT #iEng_Struct.Cmd.Req2RunAutCtrl THEN
+            #iEng_Struct.State.RunOut := 0;
+        END_IF;
+    END_IF;
+END_REGION
+
+IF NOT #iEng_Struct.State.GenErr THEN
+    #oRun := #iEng_Struct.State.RunOut;
+END_IF;
+
+REGION ErrStates                   
+    // definition of error states 
+    // error - input from digital input of plc - fyzical state of engine 
+    //
+    #SUF_Timer(IN := #iEng_Struct.State.RunOut,
+               PT := #iEng_Struct.Param.Time2Start);
+    
+    IF (#SUF_Timer.Q  AND NOT #iRunning AND #iEng_Struct.State.RunOut )THEN
+        #iEng_Struct.State.StartUpFail := 1;
+    END_IF;
+    
+
+    #iEng_Struct.State.Err := #iError;
+    #iEng_Struct.State.GenErr := #iEng_Struct.State.Err OR #iEng_Struct.State.StartUpFail;
+    
+    // calculating start up fail - if output is sets to start engine, it's expected feedback from running signal in defined time, if feedback doesn't show in this time, it should be start up fail error
+    // merge of these two error is general error
+    // 
+    
+    IF #iEng_Struct.Cmd.ResetSUF THEN
+        #iEng_Struct.State.StartUpFail := 0;
+        #iEng_Struct.State.RunOut := 0;
+        #iEng_Struct.Cmd.ResetSUF := 0;
+    END_IF;
+    
+    IF #iEng_Struct.State.GenErr THEN
+        #oRun := 0;
+        #iEng_Struct.Cmd.ManCtrl := 1;
+    END_IF;
+
+END_REGION
+
+REGION StatusInt
+    //write combination of states into int value for visualization (engine - combination of running state and error)
+    //
+    IF #iRunning AND NOT #iError THEN
+        #iEng_Struct.State.StateInt := 0;
+    END_IF;
+    
+    IF NOT #iRunning AND NOT #iError THEN
+        #iEng_Struct.State.StateInt := 1;
+    END_IF;
+    
+    IF #iError AND #iRunning THEN
+        #iEng_Struct.State.StateInt := 2;
+    END_IF;
+    
+    IF #iError AND NOT #iRunning  THEN
+        #iEng_Struct.State.StateInt := 3;
+    END_IF;
+    
+
+    
+
+    
+    
+END_REGION
+
+
+
+
+
+    
+
+

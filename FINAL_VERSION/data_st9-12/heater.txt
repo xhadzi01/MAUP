@@ -1,0 +1,67 @@
+#fMode := 3;
+"HeatingPID"(Setpoint := #iHeater_Struct.Param.HeatingSetPointAutomat,
+             Input := #iWaterTemp,
+             ManualEnable := #iHeater_Struct.State.ManCtrl,
+             ManualValue := #iHeater_Struct.Param.HeatingPowerManual,
+             OutputHeat => #iHeater_Struct.State.HeatingOut,
+             Mode:=#fMode);
+
+REGION Manual/Automat
+    
+    IF #iHeater_Struct.Cmd.AutCtrl THEN
+        #iHeater_Struct.State.AutCtrl := 1;
+        #iHeater_Struct.State.ManCtrl := 0;
+        #iHeater_Struct.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #iHeater_Struct.Cmd.ManCtrl THEN
+        #iHeater_Struct.State.AutCtrl := 0;
+        #iHeater_Struct.State.ManCtrl := 1;
+        #iHeater_Struct.Cmd.ManCtrl := 0;
+    END_IF;
+    
+    IF NOT #iHeater_Struct.State.AutCtrl AND NOT #iHeater_Struct.State.ManCtrl THEN
+        #iHeater_Struct.State.ManCtrl := 1;
+        #iHeater_Struct.State.AutCtrl := 0;
+    END_IF; 
+    
+    
+END_REGION
+
+
+REGION ManCtrl
+    IF #iHeater_Struct.Cmd.TurnOnMan THEN
+        IF  #iHeater_Struct.State.ManCtrl THEN
+            #iHeater_Struct.State.EnableOut := 1;
+            #iHeater_Struct.Param.HeatingSetPointAutomat := #iHeater_Struct.Param.HeatingPowerManual;
+            #iHeater_Struct.State.StateInt := 1;
+        END_IF;
+        #iHeater_Struct.Cmd.TurnOnMan := 0;
+    END_IF;
+    
+    IF #iHeater_Struct.Cmd.TurnOffMan THEN
+        IF  #iHeater_Struct.State.ManCtrl THEN
+            #iHeater_Struct.Param.HeatingPowerManual := 0;
+            #iHeater_Struct.State.EnableOut := 0;
+            #iHeater_Struct.Param.HeatingSetPointAutomat := 0;
+            #iHeater_Struct.State.StateInt := 0;
+        END_IF;
+        #iHeater_Struct.Cmd.TurnOffMan := 0;
+    END_IF;
+    
+END_REGION
+
+REGION AutCtrl
+    IF #iHeater_Struct.State.AutCtrl THEN
+        IF #iHeater_Struct.Cmd.Req2RunAutCtrl THEN
+            #iHeater_Struct.State.EnableOut := 1;
+            #iHeater_Struct.State.StateInt := 1;
+        ELSE
+            #iHeater_Struct.State.EnableOut := 0;
+            #iHeater_Struct.State.StateInt := 0;
+        END_IF;
+    END_IF;
+END_REGION
+
+#oHeaterPower := #iHeater_Struct.State.HeatingOut;
+//#oHeaterPower := #iHeater_Struct.Param.HeatingPowerManual;
+#oHeaterEnable := #iHeater_Struct.State.EnableOut;

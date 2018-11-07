@@ -1,0 +1,193 @@
+REGION Aut/Man
+    // switching state of engine - automatic or manual control (default state is manual)
+    
+    IF #DrainingPhase.Cmd.AutCtrl THEN
+        #DrainingPhase.State.AutCtrl := 1;
+        #DrainingPhase.State.ManCtrl := 0;
+        #DrainingPhase.Cmd.AutCtrl := 0;
+    END_IF;
+    IF #DrainingPhase.Cmd.ManCtrl THEN
+        #DrainingPhase.State.AutCtrl := 0;
+        #DrainingPhase.State.ManCtrl := 1;
+        #DrainingPhase.Cmd.ManCtrl := 0;
+    END_IF;
+    
+    IF NOT #DrainingPhase.State.AutCtrl AND NOT #DrainingPhase.State.ManCtrl THEN
+        #DrainingPhase.State.ManCtrl := 1;
+        #DrainingPhase.State.AutCtrl := 0;
+    END_IF;
+    
+    
+END_REGION
+
+REGION ManCtrl
+  
+    IF #DrainingPhase.State.ManCtrl THEN
+        IF #DrainingPhase.Cmd.StartMan THEN
+            #DrainingPhase.State.Running := 1;
+            #DrainingPhase.State.Idle := 0;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingValve.Cmd.Req2OpenAut := 1;
+            #DrainingValve.Cmd.Req2CloseAut := 0;
+            #DrainingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #DrainingPhase.Cmd.ResumeMan AND #DrainingPhase.State.Paused THEN
+            #DrainingPhase.State.Running := 1;
+            #DrainingPhase.State.Idle := 0;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingValve.Cmd.Req2OpenAut := 1;
+            #DrainingValve.Cmd.Req2CloseAut := 0;
+            #DrainingPhase.Cmd.ResumeMan := 0;
+        END_IF;
+        
+        IF #DrainingPhase.Cmd.PauseMan THEN
+            #DrainingPhase.State.Running := 0;
+            #DrainingPhase.State.Idle := 0;
+            #DrainingPhase.State.Paused := 1;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingValve.Cmd.Req2OpenAut := 0;
+            #DrainingValve.Cmd.Req2CloseAut := 1;
+            #DrainingPhase.Cmd.PauseMan := 0;
+        END_IF;
+        
+        IF #DrainingPhase.Cmd.StopMan THEN
+            #DrainingPhase.State.Running := 0;
+            #DrainingPhase.State.Idle := 1;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingValve.Cmd.Req2OpenAut := 0;
+            #DrainingValve.Cmd.Req2CloseAut := 1;
+            #DrainingPhase.Cmd.StopMan := 0;
+        END_IF;
+    END_IF;
+END_REGION
+
+REGION AutCtrl
+    // if request to run in automatic mode, and phase can be run in automatic mode, switch phase to running
+    // 
+    IF #DrainingPhase.State.AutCtrl THEN
+        IF #DrainingPhase.Cmd.StartMan THEN
+            #DrainingPhase.State.Running := 1;
+            #DrainingPhase.State.Idle := 0;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingPhase.Cmd.StartMan := 0;
+        END_IF;
+        
+        IF #DrainingPhase.Cmd.StopMan THEN
+            #DrainingPhase.State.Running := 0;
+            #DrainingPhase.State.Idle := 1;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingPhase.Cmd.StopMan := 0;
+        END_IF;
+        
+        //// auto
+        IF #DrainingPhase.Cmd.StartAut THEN
+            #DrainingPhase.State.Running := 1;
+            #DrainingPhase.State.Idle := 0;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingValve.Cmd.Req2OpenAut := 1;
+            #DrainingValve.Cmd.Req2CloseAut := 0;
+            #DrainingPhase.Cmd.StartAut := 0;
+        END_IF;
+        
+        IF #DrainingPhase.Cmd.StopAut THEN
+            #DrainingPhase.State.Running := 0;
+            #DrainingPhase.State.Idle := 1;
+            #DrainingPhase.State.Paused := 0;
+            //#DrainingPhase.State.Done := 0;
+            #DrainingValve.Cmd.Req2OpenAut := 0;
+            #DrainingValve.Cmd.Req2CloseAut := 1;
+            #DrainingPhase.Cmd.StopAut := 0;
+        END_IF;
+        
+        
+    END_IF;
+    
+END_REGION
+
+REGION Done
+    //every phase should have finish condition - filling phase - if water level is under requested level
+    //after that done state should be setted to 1
+    IF (#DrainingPhase.WaterLevel <= #DrainingPhase.Param.DrainLevel) AND #DrainingPhase.State.Running AND #DrainingValve.State.Closed THEN
+        #DrainingPhase.State.Running := 0;
+        #DrainingPhase.State.Idle := 1;
+        #DrainingPhase.State.Paused := 0;
+        #DrainingPhase.State.Done := 1;
+    END_IF;
+    
+    IF #DrainingPhase.Cmd.ResetDone AND #DrainingPhase.State.Done THEN
+        //#FillingPhase.State.Running := 0;
+        //#FillingPhase.State.Idle := 1;
+        //#FillingPhase.State.Paused := 0;
+        #DrainingPhase.State.Done := 0;
+        #DrainingPhase.Cmd.ResetDone := 0;
+    ELSIF #DrainingPhase.Cmd.ResetDone THEN
+        #DrainingPhase.Cmd.ResetDone := 0;
+    END_IF;
+    
+    
+    // command reset done resets done state and than resets command
+END_REGION
+
+REGION States 
+    //Command valve in cases of states
+    //
+    //#DrainingPhase.Param.DrainLevel := 0.01;
+    
+    IF #DrainingPhase.State.AutCtrl AND #DrainingPhase.State.Running THEN
+        IF #DrainingPhase.WaterLevel > #DrainingPhase.Param.DrainLevel THEN
+            #DrainingValve.Cmd.Req2OpenAut := 1;
+            #DrainingValve.Cmd.Req2CloseAut := 0;
+        ELSE
+            #DrainingValve.Cmd.Req2CloseAut := 1;
+            #DrainingValve.Cmd.Req2OpenAut := 0;
+        END_IF;
+    END_IF;
+    
+    IF #DrainingPhase.State.AutCtrl AND #DrainingPhase.State.Idle THEN
+        
+        #DrainingValve.Cmd.Req2CloseAut := 1;
+        #DrainingValve.Cmd.Req2OpenAut := 0;
+        
+    END_IF;
+    
+    IF #DrainingPhase.State.AutCtrl AND #DrainingPhase.State.Paused THEN
+        
+        #DrainingValve.Cmd.Req2CloseAut := 1;
+        #DrainingValve.Cmd.Req2OpenAut := 0;
+        
+    END_IF;
+    
+    IF #DrainingPhase.State.AutCtrl AND #DrainingPhase.State.Done THEN
+        
+        #DrainingValve.Cmd.Req2CloseAut := 1;
+        #DrainingValve.Cmd.Req2OpenAut := 0;
+        
+    END_IF;
+    
+END_REGION
+
+// delault state of phase - if not any state sets state to idle    
+IF (NOT #DrainingPhase.State.Running) AND (NOT #DrainingPhase.State.Paused) THEN
+    #DrainingPhase.State.Idle := 1;
+END_IF;
+
+// write binary states into int value for visualization
+IF #DrainingPhase.State.Idle THEN
+    #DrainingPhase.State.StateInt := #Idle;
+END_IF;
+IF #DrainingPhase.State.Running THEN
+    #DrainingPhase.State.StateInt := #Running;
+END_IF;
+IF #DrainingPhase.State.Paused THEN
+    #DrainingPhase.State.StateInt := #Pause;
+END_IF;
+IF #DrainingPhase.State.Done THEN
+    #DrainingPhase.State.StateInt := #Idle;
+END_IF;

@@ -1,0 +1,1 @@
+#aoScaledValue := (INT_TO_LREAL(#aiRAWanalog) * #ScaledValHiLevel /INT_TO_LREAL(#TransducerHiLevel));
